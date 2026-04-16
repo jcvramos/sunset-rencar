@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Vehicle extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'plate', 'name', 'vehicle_type_id', 'brand', 'model', 'year',
+        'color', 'seats', 'status', 'is_own', 'sublessor_id',
+        'daily_rate', 'deposit_amount', 'description',
+        'main_photo', 'photos', 'is_active',
+    ];
+
+    protected $casts = [
+        'photos' => 'array',
+        'is_own' => 'boolean',
+        'is_active' => 'boolean',
+        'daily_rate' => 'decimal:2',
+        'deposit_amount' => 'decimal:2',
+    ];
+
+    public function vehicleType(): BelongsTo
+    {
+        return $this->belongsTo(VehicleType::class);
+    }
+
+    public function availability(): HasMany
+    {
+        return $this->hasMany(VehicleAvailability::class);
+    }
+
+    public function isAvailableForDates(string $startDate, string $endDate): bool
+    {
+        return !$this->availability()
+            ->whereBetween('date', [$startDate, $endDate])
+            ->exists();
+    }
+}

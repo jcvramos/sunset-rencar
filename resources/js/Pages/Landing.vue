@@ -316,8 +316,9 @@ const getWhatsappLink = (msg = '') => {
 };
 
 // ── Navbar scroll + mobile menu ──────────────────────────────────────────────
-const scrolled   = ref(false);
-const mobileOpen = ref(false);
+const scrolled      = ref(false);
+const mobileOpen    = ref(false);
+const scrollProgress = ref(0);
 
 // ── 3D Particle Canvas ───────────────────────────────────────────────────────
 let animFrameId = null;
@@ -497,6 +498,90 @@ function initCounters() {
     counters.forEach(c => obs.observe(c));
 }
 
+// ── Scroll progress ───────────────────────────────────────────────────────────
+function initScrollProgress() {
+    window.addEventListener('scroll', () => {
+        const total = document.documentElement.scrollHeight - window.innerHeight;
+        scrollProgress.value = total > 0 ? (window.scrollY / total) * 100 : 0;
+    }, { passive: true });
+}
+
+
+// ── Hero video parallax ───────────────────────────────────────────────────────
+function initHeroParallax() {
+    const vid = document.querySelector('#inicio video');
+    if (!vid) return;
+    window.addEventListener('scroll', () => {
+        const p = Math.min(window.scrollY / window.innerHeight, 1);
+        vid.style.transform = `scale(${1 + p * 0.07}) translateY(${p * 35}px)`;
+    }, { passive: true });
+}
+
+// ── Card spotlight ────────────────────────────────────────────────────────────
+function initSpotlightCards() {
+    document.querySelectorAll('.tilt-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const r = card.getBoundingClientRect();
+            card.style.setProperty('--sx', `${((e.clientX - r.left) / r.width) * 100}%`);
+            card.style.setProperty('--sy', `${((e.clientY - r.top)  / r.height) * 100}%`);
+            card.style.setProperty('--so', '1');
+        });
+        card.addEventListener('mouseleave', () => card.style.setProperty('--so', '0'));
+    });
+}
+
+// ── Cinematic scroll effects ──────────────────────────────────────────────────
+function initCinematicScrollEffects() {
+    // ── Clip-path reveal para h2 ───────────────────────────────
+    const revealEls = document.querySelectorAll('.reveal-clip');
+    const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                e.target.classList.add('revealed');
+                revealObs.unobserve(e.target);
+            }
+        });
+    }, { threshold: 0.25 });
+    revealEls.forEach(el => revealObs.observe(el));
+
+    // ── Parallax en imágenes de galería ───────────────────────
+    const applyParallax = () => {
+        document.querySelectorAll('.parallax-wrap').forEach(wrap => {
+            const img = wrap.querySelector('.parallax-img');
+            if (!img) return;
+            const rect = wrap.getBoundingClientRect();
+            const center = rect.top + rect.height / 2 - window.innerHeight / 2;
+            img.style.transform = `translateY(${center * 0.1}px) scale(1.18)`;
+        });
+    };
+    window.addEventListener('scroll', applyParallax, { passive: true });
+    applyParallax();
+
+    // ── Cinematic zoom lento en secciones con bg-image ────────
+    document.querySelectorAll('.cinematic-section').forEach(sec => {
+        const overlay = sec.querySelector('.cinematic-glow');
+        if (!overlay) return;
+        window.addEventListener('scroll', () => {
+            const rect = sec.getBoundingClientRect();
+            const p = 1 - Math.max(0, Math.min(1, rect.top / window.innerHeight));
+            overlay.style.opacity = (p * 0.06).toString();
+        }, { passive: true });
+    });
+}
+
+// ── Magnetic elements ─────────────────────────────────────────────────────────
+function initMagnetic() {
+    document.querySelectorAll('.magnetic').forEach(el => {
+        el.addEventListener('mousemove', (e) => {
+            const r  = el.getBoundingClientRect();
+            const dx = (e.clientX - r.left - r.width  / 2) * 0.28;
+            const dy = (e.clientY - r.top  - r.height / 2) * 0.28;
+            el.style.transform = `translate(${dx}px,${dy}px)`;
+        });
+        el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+    });
+}
+
 onMounted(() => {
     AOS.init({ duration: 800, once: true, easing: 'ease-out-cubic', offset: 60 });
 
@@ -515,6 +600,11 @@ onMounted(() => {
         initParticleCanvas();
         initCardTilt();
         initCounters();
+        initScrollProgress();
+        initHeroParallax();
+        initSpotlightCards();
+        initMagnetic();
+        initCinematicScrollEffects();
     }, 100);
 });
 
@@ -567,6 +657,10 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
 <template>
     <Head :title="tx.pageTitle" />
 
+    <!-- ── Scroll progress bar ──────────────────────────────────────────────── -->
+    <div class="fixed top-0 left-0 z-[200] h-[3px] pointer-events-none will-change-[width]"
+         :style="{width: scrollProgress + '%', background:'linear-gradient(90deg,#f59e0b,#fb923c,#fbbf24)'}"></div>
+
     <!-- ═══════════════════ ANNOUNCEMENT BAR ════════════════════════════════ -->
     <div class="bg-gradient-to-r from-amber-600 via-yellow-400 to-orange-500 text-black text-xs font-bold py-2 px-4 text-center tracking-wide">
         {{ tx.announcementBar }}
@@ -580,7 +674,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
     <header class="sticky top-0 left-0 right-0 z-50 transition-all duration-500"
         :class="scrolled
             ? 'bg-[#0a0806]/96 backdrop-blur-md shadow-lg shadow-black/60'
-            : 'bg-[#0a0806]/75 backdrop-blur-sm'">
+            : 'bg-[#001440]/50 backdrop-blur-sm'">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between py-3">
 
             <!-- Logo -->
@@ -649,204 +743,216 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
     </header>
 
     <!-- ═══════════════════ HERO ═════════════════════════════════════════════ -->
-    <section id="inicio" class="relative min-h-screen bg-[#080604] overflow-hidden flex flex-col justify-center">
+    <section id="inicio" class="relative min-h-screen overflow-hidden flex flex-col justify-center" style="background:#0A0A0A;">
 
-        <!-- Video de fondo -->
-        <video autoplay muted loop playsinline
+        <!-- Video cinemático de fondo -->
+        <video autoplay muted loop playsinline id="hero-video"
             class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            style="opacity:0.45; z-index:0;">
-            <source src="/img/Video_Para_Landing_Page_Veh%C3%ADculos.mp4" type="video/mp4">
-            <source src="/img/12127397_3840_2160_30fps.mp4" type="video/mp4">
+            style="z-index:0; opacity:0.35; will-change:transform;">
+            <source src="/img/hero_video.mp4" type="video/mp4">
         </video>
 
-        <!-- Canvas 3D: partículas + speed lines -->
-        <canvas id="hero-canvas"
-            class="absolute inset-0 w-full h-full pointer-events-none"
-            style="z-index:2;"></canvas>
+        <!-- Overlay sutil para legibilidad del texto -->
+        <div class="absolute inset-0 hero-gradient pointer-events-none" style="z-index:1;"></div>
 
-        <!-- Gradiente sunset en el fondo -->
-        <div class="absolute inset-0 pointer-events-none"
-             style="z-index:1; background: radial-gradient(ellipse at 50% 110%, rgba(251,146,60,0.25) 0%, rgba(234,179,8,0.12) 35%, transparent 65%);"></div>
-        <!-- Overlay oscuro direccional -->
-        <div class="absolute inset-0 bg-gradient-to-b from-[#080604]/80 via-[#080604]/30 to-[#080604]/90 pointer-events-none" style="z-index:1;"></div>
-        <div class="absolute inset-0 bg-gradient-to-r from-[#080604]/65 via-transparent to-[#080604]/65 pointer-events-none" style="z-index:1;"></div>
-
-        <!-- Animated sunset glow rings -->
-        <div class="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none" style="z-index:1;">
-            <div class="glow-ring" style="--s:700px;--c:rgba(251,146,60,0.07);--d:0s;"></div>
-            <div class="glow-ring" style="--s:900px;--c:rgba(234,179,8,0.05);--d:1.2s;"></div>
-            <div class="glow-ring" style="--s:1100px;--c:rgba(251,146,60,0.03);--d:2.4s;"></div>
+        <!-- Partículas decorativas superpuestas -->
+        <div class="absolute inset-0 pointer-events-none overflow-hidden" style="z-index:1;">
+            <div class="absolute inset-0 hero-dots"></div>
+            <!-- Glow top-center para profundidad -->
+            <div class="absolute inset-0"
+                 style="background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255,107,53,0.08) 0%, transparent 60%);"></div>
         </div>
 
-        <!-- Contenido centrado -->
-        <div class="relative w-full max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-20 flex flex-col items-center text-center" style="z-index:3;">
+        <!-- Ola inferior hacia el dark -->
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none" style="z-index:2;">
+            <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" class="w-full block">
+                <path d="M0,50 C360,10 720,70 1080,30 C1260,10 1380,45 1440,50 L1440,80 L0,80 Z" fill="#0c0a07"/>
+            </svg>
+        </div>
 
-            <!-- Badge con pulse flotante -->
-            <div class="inline-flex items-center gap-2 bg-amber-400/10 border border-amber-400/35
-                        text-amber-300 text-xs font-bold px-5 py-2 rounded-full mb-8 uppercase tracking-widest backdrop-blur-sm badge-float"
-                data-aos="fade-down">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block"></span>
-                {{ tx.heroBadge }}
-            </div>
+        <!-- Contenido -->
+        <div class="relative w-full max-w-5xl mx-auto px-4 sm:px-6 pt-28 pb-24 flex flex-col items-center text-center" style="z-index:3;">
 
-            <!-- Titular 3D + shimmer -->
-            <h1 class="text-5xl sm:text-6xl lg:text-8xl font-black text-white leading-none mb-5 tracking-tight hero-title-3d"
-                data-aos="fade-up" data-aos-delay="80">
-                <span class="block">{{ tx.heroTitle1 }}</span>
-                <span class="shimmer-text">{{ tx.heroTitle2 }}</span>
+            <!-- Kicker / badge estilo premium -->
+            <p class="text-orange-300/80 text-sm font-semibold uppercase tracking-[0.25em] mb-4"
+               data-aos="fade-down">
+                🌅 {{ tx.heroBadge }}
+            </p>
+
+            <!-- Headline principal -->
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-3 leading-tight tracking-tight"
+                data-aos="fade-up" data-aos-delay="60"
+                style="text-shadow:0 2px 32px rgba(0,0,0,0.6);">
+                {{ tx.heroTitle1 }} <span class="hero-accent-text">{{ tx.heroTitle2 }}</span>
             </h1>
 
-            <p class="text-amber-100/60 text-lg sm:text-xl mb-12 max-w-xl leading-relaxed"
-                data-aos="fade-up" data-aos-delay="160">
+            <!-- Subtítulo -->
+            <p class="text-orange-100/65 text-base sm:text-lg mb-10 max-w-md leading-relaxed"
+               data-aos="fade-up" data-aos-delay="120">
                 {{ tx.heroSubtitle }}
             </p>
 
-            <!-- ══ WIDGET ESTILO SIXT ══════════════════════════════════════ -->
-            <div class="w-full max-w-5xl" data-aos="fade-up" data-aos-delay="260">
+            <!-- ══ WIDGET ESTILO SKYSCANNER ════════════════════════════════ -->
+            <div class="w-full max-w-4xl" data-aos="fade-up" data-aos-delay="200">
 
-                <!-- Toggle diferente lugar de devolución -->
-                <div class="flex items-center gap-3 mb-3 justify-start pl-1">
-                    <label class="flex items-center gap-2 cursor-pointer select-none group">
-                        <span class="relative inline-flex h-5 w-9 shrink-0">
-                            <input v-model="search.differentReturn" type="checkbox" class="peer sr-only"/>
-                            <span class="absolute inset-0 rounded-full bg-white/20 peer-checked:bg-amber-400 transition-colors duration-200"></span>
-                            <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4"></span>
-                        </span>
-                        <span class="text-amber-100/60 text-xs font-medium group-hover:text-amber-200 transition-colors">
-                            {{ tx.widgetDiffReturn }}
-                        </span>
-                    </label>
+                <!-- Tabs Skyscanner-style -->
+                <div class="flex items-end gap-1 mb-0">
+                    <!-- Tab activo: Alquiler de Auto -->
+                    <div class="flex items-center gap-2 bg-white font-bold text-sm px-6 py-3.5 rounded-t-xl shadow-sm select-none"
+                         style="color:#c0460a;">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+                        </svg>
+                        Alquiler de Auto
+                    </div>
+                    <!-- Tab inactivo: Traslado -->
+                    <div class="flex items-center gap-2 bg-black/25 hover:bg-black/35 text-white/70 hover:text-white font-medium text-sm px-5 py-3 rounded-t-xl transition-colors cursor-default select-none backdrop-blur-sm">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+                        </svg>
+                        Traslado Aeropuerto
+                    </div>
                 </div>
 
-                <!-- Widget 2 filas -->
-                <div class="rounded-2xl overflow-hidden shadow-2xl shadow-black/70"
-                     style="background:#fffdf8; border:1px solid rgba(251,191,36,0.15);">
+                <!-- Widget card Priceline-style -->
+                <div class="shadow-[0_24px_64px_rgba(0,0,0,0.32)] rounded-b-2xl rounded-tr-2xl bg-white" style="overflow:visible;">
 
-                    <!-- FILA 1: Ubicación -->
-                    <div class="flex flex-col sm:flex-row border-b" style="border-color:#e8e4dc;">
+                    <!-- FILA 1: Ubicaciones ── estilo Priceline (labels grises, inputs grandes) -->
+                    <div class="flex flex-col sm:flex-row" style="border-bottom:1px solid #e8eaed;">
 
-                        <!-- Lugar de recogida -->
-                        <div class="flex-1 flex flex-col px-6 pt-5 pb-4 transition-colors border-b sm:border-b-0 sm:border-r"
-                             :style="{borderColor:'#e8e4dc', background: focusedField==='location' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2" style="color:#f59e0b;">
-                                <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                        <!-- Recogida -->
+                        <div class="flex-1 min-w-0 flex flex-col px-6 pt-5 pb-5 transition-all duration-150 border-b sm:border-b-0 sm:border-r"
+                             :style="{borderColor:'#e8eaed', background: focusedField==='location' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 select-none">
+                                <svg class="w-3 h-3 shrink-0 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                                 {{ tx.widgetLocation }}
-                            </span>
-                            <input v-model="search.location" type="text"
-                                :placeholder="tx.widgetLocationPh"
+                            </label>
+                            <input v-model="search.location" type="text" :placeholder="tx.widgetLocationPh"
                                 @focus="focusedField='location'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-base font-semibold outline-none"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;"/>
+                                class="w-full bg-transparent text-[15px] font-bold outline-none text-gray-900 placeholder-gray-300 leading-snug"/>
                         </div>
 
-                        <!-- Lugar devolución (opcional) -->
+                        <!-- Devolución diferente (opcional) -->
                         <div v-if="search.differentReturn"
-                             class="flex-1 flex flex-col px-6 pt-5 pb-4 transition-colors"
-                             :style="{background: focusedField==='returnLocation' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2" style="color:#f97316;">
+                             class="flex-1 min-w-0 flex flex-col px-6 pt-5 pb-5 transition-all duration-150 border-b sm:border-b-0 sm:border-r"
+                             :style="{borderColor:'#e8eaed', background: focusedField==='returnLocation' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 select-none">
                                 <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                                 {{ tx.widgetReturnLocation }}
-                            </span>
-                            <input v-model="search.returnLocation" type="text"
-                                :placeholder="tx.widgetLocationPh"
+                            </label>
+                            <input v-model="search.returnLocation" type="text" :placeholder="tx.widgetLocationPh"
                                 @focus="focusedField='returnLocation'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-base font-semibold outline-none"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;"/>
+                                class="w-full bg-transparent text-[15px] font-bold outline-none text-gray-900 placeholder-gray-300 leading-snug"/>
                         </div>
                     </div>
 
-                    <!-- FILA 2: Fechas + Horas + Botón -->
-                    <div class="flex flex-col sm:flex-row sm:items-stretch">
+                    <!-- FILA 2: 4 campos de fecha/hora en grid equitativo -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4" style="border-bottom:1px solid #e8eaed;">
 
-                        <!-- Fecha recogida -->
-                        <div class="flex-1 flex flex-col px-5 pt-4 pb-4 transition-colors border-b sm:border-b-0 sm:border-r"
-                             :style="{borderColor:'#e8e4dc', background: focusedField==='pickupDate' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2 whitespace-nowrap" style="color:#f59e0b;">
+                        <!-- Recogida fecha -->
+                        <div class="flex flex-col px-4 sm:px-6 pt-4 pb-4 transition-all duration-150 border-b sm:border-b-0 border-r"
+                             :style="{borderColor:'#e8eaed', background: focusedField==='pickupDate' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 whitespace-nowrap select-none">
                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 {{ tx.widgetPickupDate }}
-                            </span>
+                            </label>
                             <input v-model="search.pickupDate" type="date" :min="today"
                                 @focus="focusedField='pickupDate'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-sm font-semibold outline-none cursor-pointer [color-scheme:light]"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;"/>
+                                class="w-full bg-transparent text-[13px] sm:text-[14px] font-bold outline-none cursor-pointer [color-scheme:light] text-gray-900"/>
                         </div>
 
-                        <!-- Hora recogida -->
-                        <div class="flex-1 flex flex-col px-5 pt-4 pb-4 transition-colors border-b sm:border-b-0 sm:border-r"
-                             :style="{borderColor:'#e8e4dc', background: focusedField==='pickupTime' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2 whitespace-nowrap" style="color:#f59e0b;">
+                        <!-- Recogida hora -->
+                        <div class="flex flex-col px-4 sm:px-6 pt-4 pb-4 transition-all duration-150 border-b sm:border-b-0 sm:border-r"
+                             :style="{borderColor:'#e8eaed', background: focusedField==='pickupTime' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 whitespace-nowrap select-none">
                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 {{ tx.widgetPickupTime }}
-                            </span>
+                            </label>
                             <select v-model="search.pickupTime"
                                 @focus="focusedField='pickupTime'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-sm font-semibold outline-none cursor-pointer"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;">
+                                class="w-full bg-transparent text-[13px] sm:text-[14px] font-bold outline-none cursor-pointer text-gray-900">
                                 <option v-for="t in timeSlots" :key="t" :value="t">{{ t }}</option>
                             </select>
                         </div>
 
-                        <!-- Fecha entrega -->
-                        <div class="flex-1 flex flex-col px-5 pt-4 pb-4 transition-colors border-b sm:border-b-0 sm:border-r"
-                             :style="{borderColor:'#e8e4dc', background: focusedField==='returnDate' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2 whitespace-nowrap" style="color:#f97316;">
+                        <!-- Entrega fecha -->
+                        <div class="flex flex-col px-4 sm:px-6 pt-4 pb-4 transition-all duration-150 border-r"
+                             :style="{borderColor:'#e8eaed', background: focusedField==='returnDate' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 whitespace-nowrap select-none">
                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 {{ tx.widgetReturnDate }}
-                            </span>
+                            </label>
                             <input v-model="search.returnDate" type="date" :min="search.pickupDate || today"
                                 @focus="focusedField='returnDate'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-sm font-semibold outline-none cursor-pointer [color-scheme:light]"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;"/>
+                                class="w-full bg-transparent text-[13px] sm:text-[14px] font-bold outline-none cursor-pointer [color-scheme:light] text-gray-900"/>
                         </div>
 
-                        <!-- Hora entrega -->
-                        <div class="flex-1 flex flex-col px-5 pt-4 pb-4 transition-colors border-b sm:border-b-0 sm:border-r"
-                             :style="{borderColor:'#e8e4dc', background: focusedField==='returnTime' ? '#fff5e6' : 'transparent'}">
-                            <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2 whitespace-nowrap" style="color:#f97316;">
+                        <!-- Entrega hora -->
+                        <div class="flex flex-col px-4 sm:px-6 pt-4 pb-4 transition-all duration-150"
+                             :style="{background: focusedField==='returnTime' ? '#fffbf0' : '#fff'}">
+                            <label class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1.5 whitespace-nowrap select-none">
                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 {{ tx.widgetReturnTime }}
-                            </span>
+                            </label>
                             <select v-model="search.returnTime"
                                 @focus="focusedField='returnTime'" @blur="focusedField=null"
-                                class="w-full bg-transparent text-sm font-semibold outline-none cursor-pointer"
-                                style="color:#1c1a16; font-family:'Inter',sans-serif;">
+                                class="w-full bg-transparent text-[13px] sm:text-[14px] font-bold outline-none cursor-pointer text-gray-900">
                                 <option v-for="t in timeSlots" :key="t" :value="t">{{ t }}</option>
                             </select>
                         </div>
+                    </div>
 
-                        <!-- Botón CTA -->
+                    <!-- FILA 3: Toggle izquierda + Botón CTA derecha (Priceline style) -->
+                    <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4" style="background:#fafbfc;">
+                        <label class="flex items-center gap-2.5 cursor-pointer select-none group shrink-0">
+                            <span class="relative inline-flex h-5 w-9 shrink-0">
+                                <input v-model="search.differentReturn" type="checkbox" class="peer sr-only"/>
+                                <span class="absolute inset-0 rounded-full bg-gray-200 peer-checked:bg-amber-400 transition-colors duration-200"></span>
+                                <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 peer-checked:translate-x-4"></span>
+                            </span>
+                            <span class="text-[12px] text-gray-500 font-medium group-hover:text-gray-700 transition-colors">
+                                {{ tx.widgetDiffReturn }}
+                            </span>
+                        </label>
+
+                        <span class="hidden sm:block text-[11px] text-gray-400 ml-auto mr-3 shrink-0">{{ tx.widgetNote }}</span>
+
+                        <!-- Botón CTA — siempre visible, nunca recortado -->
                         <button @click="searchWhatsapp"
-                            class="flex items-center justify-center gap-2 px-7 py-5 font-black text-sm text-black transition-all active:scale-95 hover:brightness-110 whitespace-nowrap sm:min-w-[185px]"
-                            style="background:linear-gradient(135deg,#fbbf24,#f97316); font-family:'Syne',sans-serif;">
+                            class="w-full sm:w-auto flex items-center justify-center gap-2.5
+                                   px-8 py-3.5 font-black text-[15px] text-black rounded-xl
+                                   transition-all active:scale-95 hover:brightness-105 whitespace-nowrap shrink-0"
+                            style="background: linear-gradient(135deg, #FF6B35 0%, #FFB347 100%);
+                                   box-shadow: 0 4px 24px rgba(255,107,53,0.55);">
                             <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.117.553 4.103 1.523 5.83L.057 23.886a.5.5 0 00.608.61l6.233-1.638A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.89 0-3.663-.522-5.179-1.43l-.371-.219-3.845 1.01 1.029-3.74-.24-.385A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                            <span>{{ tx.widgetCta }}</span>
+                            {{ tx.widgetCta }}
                         </button>
-                     </div>
-                </div><!-- /widget card -->
-            </div><!-- /max-w-5xl -->
+                    </div>
+                </div><!-- /widget card Priceline -->
 
-                <!-- Trust signals bajo el widget -->
-                <div class="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-                    <span class="text-xs text-amber-100/40 flex items-center gap-1.5">
-                        <span class="w-1 h-1 rounded-full bg-green-400 inline-block"></span>{{ tx.trustNoHidden }}
+                <!-- Trust pills — estilo Rentalcars -->
+                <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+                    <span class="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold px-4 py-2 rounded-full border border-white/15">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{{ tx.trustNoHidden }}
                     </span>
-                    <span class="text-xs text-amber-100/40 flex items-center gap-1.5">
-                        <span class="w-1 h-1 rounded-full bg-green-400 inline-block"></span>{{ tx.trustImmediate }}
+                    <span class="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold px-4 py-2 rounded-full border border-white/15">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{{ tx.trustImmediate }}
                     </span>
-                    <span class="text-xs text-amber-100/40 flex items-center gap-1.5">
-                        <span class="w-1 h-1 rounded-full bg-green-400 inline-block"></span>{{ tx.trustInsurance }}
+                    <span class="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold px-4 py-2 rounded-full border border-white/15">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{{ tx.trustInsurance }}
                     </span>
-                    <span class="text-xs text-amber-100/40 flex items-center gap-1.5">
-                        <span class="w-1 h-1 rounded-full bg-green-400 inline-block"></span>{{ tx.trustAirport }}
+                    <span class="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-semibold px-4 py-2 rounded-full border border-white/15">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{{ tx.trustAirport }}
                     </span>
                 </div>
+            </div><!-- /max-w-4xl -->
 
             <!-- Scroll indicator -->
-            <div class="mt-14 flex flex-col items-center gap-2 text-amber-100/20 text-xs">
-                <div class="w-px h-10 bg-gradient-to-b from-transparent to-amber-400/40 animate-pulse"></div>
+            <div class="mt-12 flex flex-col items-center gap-2 text-white/25 text-xs">
+                <div class="w-px h-8 bg-gradient-to-b from-transparent to-white/40 animate-pulse"></div>
                 <span class="tracking-widest uppercase text-[10px]">scroll</span>
             </div>
-        </div><!-- /contenido centrado -->
+        </div>
     </section>
 
     <!-- ═══════════════════ STATS BAR ════════════════════════════════════════ -->
@@ -874,7 +980,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
     </section>
 
     <!-- ═══════════════════ CÓMO FUNCIONA ════════════════════════════════════ -->
-    <section id="como-funciona" class="py-24 relative overflow-hidden" style="background:#0c0a07;">
+    <section id="como-funciona" class="py-24 relative overflow-hidden cinematic-section" style="background:#0c0a07;">
         <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent"></div>
         <div class="absolute inset-0 pointer-events-none"
              style="background: radial-gradient(ellipse at 50% 0%, rgba(251,146,60,0.05) 0%, transparent 60%);"></div>
@@ -882,7 +988,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
         <div class="max-w-7xl mx-auto px-6 relative">
             <div class="text-center mb-16" data-aos="fade-up">
                 <span class="text-amber-400 font-bold text-xs uppercase tracking-[0.3em]">{{ tx.howBadge }}</span>
-                <h2 class="text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.howTitle }}</h2>
+                <h2 class="reveal-clip text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.howTitle }}</h2>
                 <p class="text-amber-100/40 mt-4 max-w-lg mx-auto">{{ tx.howSubtitle }}</p>
             </div>
 
@@ -910,10 +1016,10 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
 
             <div class="text-center mt-14" data-aos="fade-up">
                 <a :href="getWhatsappLink(tx.waStart)" target="_blank"
-                    class="inline-flex items-center gap-3 px-8 py-4
+                    class="magnetic inline-flex items-center gap-3 px-8 py-4
                            bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400
                            hover:from-amber-300 hover:to-orange-300
-                           text-black font-black text-base rounded-xl transition-all hover:scale-105 hover:shadow-xl hover:shadow-amber-400/25">
+                           text-black font-black text-base rounded-xl transition-[background,box-shadow] hover:shadow-xl hover:shadow-amber-400/25">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.117.553 4.103 1.523 5.83L.057 23.886a.5.5 0 00.608.61l6.233-1.638A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.89 0-3.663-.522-5.179-1.43l-.371-.219-3.845 1.01 1.029-3.74-.24-.385A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
                     {{ tx.howCta }}
                 </a>
@@ -926,7 +1032,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-14" data-aos="fade-up">
                 <span class="text-amber-400 font-bold text-xs uppercase tracking-[0.3em]">{{ tx.fleetBadge }}</span>
-                <h2 class="text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.fleetTitle }}</h2>
+                <h2 class="reveal-clip text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.fleetTitle }}</h2>
                 <p class="text-amber-100/40 mt-4 max-w-lg mx-auto">{{ tx.fleetSubtitle }}</p>
             </div>
 
@@ -985,7 +1091,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
     </section>
 
     <!-- ═══════════════════ SERVICIOS ════════════════════════════════════════ -->
-    <section id="servicios" class="py-24 relative overflow-hidden" style="background:#090705;">
+    <section id="servicios" class="py-24 relative overflow-hidden cinematic-section" style="background:#090705;">
         <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent"></div>
         <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent"></div>
         <div class="absolute inset-0 pointer-events-none"
@@ -994,7 +1100,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-16" data-aos="fade-up">
                 <span class="text-amber-400 font-bold text-xs uppercase tracking-[0.3em]">{{ tx.servicesBadge }}</span>
-                <h2 class="text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.servicesTitle }}</h2>
+                <h2 class="reveal-clip text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.servicesTitle }}</h2>
                 <p class="text-amber-100/40 mt-4 max-w-lg mx-auto">{{ tx.servicesSubtitle }}</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1002,7 +1108,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
                     data-aos="fade-up" :data-aos-delay="(i % 3) * 100"
                     class="flex items-start gap-4 p-6 rounded-2xl border border-amber-400/10 hover:border-amber-400/30 transition-all group"
                     style="background:#0f0c08;">
-                    <div class="text-4xl shrink-0 group-hover:scale-110 transition-transform">{{ s.icon }}</div>
+                    <div class="svc-icon text-4xl shrink-0 transition-all duration-300">{{ s.icon }}</div>
                     <div>
                         <h3 class="text-white font-bold text-base mb-1">{{ s.title }}</h3>
                         <p class="text-amber-100/40 text-sm leading-relaxed">{{ s.desc }}</p>
@@ -1035,7 +1141,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
     </section>
 
     <!-- ═══════════════════ TESTIMONIOS ══════════════════════════════════════ -->
-    <section class="py-24 relative overflow-hidden" style="background:#090705;">
+    <section class="py-24 relative overflow-hidden cinematic-section" style="background:#090705;">
         <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-400/25 to-transparent"></div>
         <div class="absolute inset-0 pointer-events-none"
              style="background: radial-gradient(ellipse at 20% 50%, rgba(234,179,8,0.03) 0%, transparent 60%);"></div>
@@ -1043,7 +1149,7 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-16" data-aos="fade-up">
                 <span class="text-amber-400 font-bold text-xs uppercase tracking-[0.3em]">{{ tx.testimonialsBadge }}</span>
-                <h2 class="text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.testimonialsTitle }}</h2>
+                <h2 class="reveal-clip text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.testimonialsTitle }}</h2>
                 <p class="text-amber-100/40 mt-4 max-w-lg mx-auto">{{ tx.testimonialsSubtitle }}</p>
             </div>
 
@@ -1201,31 +1307,31 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
         <div class="max-w-7xl mx-auto px-6 py-24">
             <div class="text-center mb-14" data-aos="fade-up">
                 <span class="text-amber-400 font-bold text-xs uppercase tracking-[0.3em]">{{ tx.galleryBadge }}</span>
-                <h2 class="text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.galleryTitle }}</h2>
+                <h2 class="reveal-clip text-4xl sm:text-5xl font-black text-white mt-3">{{ tx.galleryTitle }}</h2>
                 <p class="text-amber-100/40 mt-4 max-w-lg mx-auto">{{ tx.gallerySubtitle }}</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3" data-aos="fade-up" data-aos-delay="100">
-                <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-2xl h-72 md:h-auto" style="min-height:400px;">
+                <div class="parallax-wrap md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-2xl h-72 md:h-auto" style="min-height:400px;">
                     <img src="/img/pexels-mikebirdy-4003121.jpg" alt="Vehículo Sunset RentCar"
-                        class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                        class="parallax-img absolute inset-0 w-full h-full object-cover transition-none"/>
                     <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
                     <div class="absolute bottom-6 left-6">
                         <span class="text-amber-400 font-bold text-xs uppercase tracking-widest">{{ tx.galleryLabel1 }}</span>
                         <h3 class="text-white font-black text-2xl mt-1">{{ tx.galleryText1 }}</h3>
                     </div>
                 </div>
-                <div class="relative group overflow-hidden rounded-2xl h-56">
+                <div class="parallax-wrap relative group overflow-hidden rounded-2xl h-56">
                     <img src="/img/pexels-vyacheslav-bobin-105199946-13033349.jpg" alt="Carretera Honduras"
-                        class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                        class="parallax-img absolute inset-0 w-full h-full object-cover transition-none"/>
                     <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                     <div class="absolute bottom-4 left-4">
                         <span class="text-amber-400 font-bold text-xs uppercase tracking-widest">{{ tx.galleryLabel2 }}</span>
                         <h3 class="text-white font-bold text-base mt-0.5">{{ tx.galleryText2 }}</h3>
                     </div>
                 </div>
-                <div class="relative group overflow-hidden rounded-2xl h-56">
+                <div class="parallax-wrap relative group overflow-hidden rounded-2xl h-56">
                     <img src="/img/pexels-alfonso-romo-2155321859-35153444.jpg" alt="Viaje en familia"
-                        class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                        class="parallax-img absolute inset-0 w-full h-full object-cover transition-none"/>
                     <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                     <div class="absolute bottom-4 left-4">
                         <span class="text-amber-400 font-bold text-xs uppercase tracking-widest">{{ tx.galleryLabel3 }}</span>
@@ -1298,11 +1404,13 @@ const uniqueTypes = computed(() => [...new Set(tx.value.vehicles.map(v => v.type
 
     <!-- Botón WhatsApp flotante -->
     <a :href="getWhatsappLink()" target="_blank"
-        class="fixed bottom-6 right-6 z-50 w-14 h-14 bg-green-500 hover:bg-green-400 text-white rounded-full
+        class="magnetic fixed bottom-6 right-6 z-50 w-14 h-14 bg-green-500 hover:bg-green-400 text-white rounded-full
                shadow-2xl shadow-green-900/50 flex items-center justify-center
-               transition-all hover:scale-110 hover:rotate-6"
+               transition-[background-color,box-shadow] hover:shadow-green-500/40 hover:shadow-2xl"
         title="WhatsApp">
-        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.117.553 4.103 1.523 5.83L.057 23.886a.5.5 0 00.608.61l6.233-1.638A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.89 0-3.663-.522-5.179-1.43l-.371-.219-3.845 1.01 1.029-3.74-.24-.385A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+        <span class="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-20 pointer-events-none"></span>
+        <span class="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-10 pointer-events-none" style="animation-delay:0.7s;animation-duration:2.2s;"></span>
+        <svg class="w-7 h-7 relative z-10" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.117.553 4.103 1.523 5.83L.057 23.886a.5.5 0 00.608.61l6.233-1.638A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.89 0-3.663-.522-5.179-1.43l-.371-.219-3.845 1.01 1.029-3.74-.24-.385A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
     </a>
 </template>
 
@@ -1315,16 +1423,57 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     filter: invert(1) opacity(0.75);
 }
 
-/* ── 3D Hero Title ───────────────────────────────────────────── */
-.hero-title-3d {
-    text-shadow:
-        0 2px 0 rgba(0,0,0,0.5),
-        0 4px 12px rgba(0,0,0,0.4),
-        0 0 60px rgba(251,146,60,0.1);
-    transform-style: preserve-3d;
+/* ── Hero gradient background (sunset overlay) ───────────────── */
+.hero-gradient {
+    background: linear-gradient(
+        180deg,
+        rgba(10,10,10,0.55) 0%,
+        rgba(10,10,10,0.20) 45%,
+        rgba(10,10,10,0.60) 100%
+    );
 }
 
-/* ── Shimmer text ────────────────────────────────────────────── */
+/* ── Hero dot pattern ────────────────────────────────────────── */
+.hero-dots {
+    background-image: radial-gradient(circle, rgba(255,179,71,0.10) 1px, transparent 1px);
+    background-size: 36px 36px;
+    opacity: 0.8;
+}
+
+/* ── Hero accent text (sunset naranja → dorado) ──────────────── */
+.hero-accent-text {
+    background: linear-gradient(90deg, #FF6B35 0%, #FFB347 40%, #FF8C42 70%, #FF6B35 100%);
+    background-size: 250% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+    display: block;
+    filter: drop-shadow(0 2px 20px rgba(255,107,53,0.55));
+}
+
+/* ── Shimmer text (versión clara sobre gradiente amber) ──────── */
+.shimmer-text-light {
+    background: linear-gradient(
+        90deg,
+        #ffffff  0%,
+        #fef9c3 20%,
+        #ffffff 40%,
+        #fde68a 55%,
+        #ffffff 70%,
+        #fef3c7 85%,
+        #ffffff 100%
+    );
+    background-size: 250% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+    display: block;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
+}
+
+/* ── Shimmer text (versión original oscura — se conserva) ────── */
 .shimmer-text {
     background: linear-gradient(
         90deg,
@@ -1403,9 +1552,118 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .tilt-card {
     transform-style: preserve-3d;
     will-change: transform;
+    position: relative;
 }
 .tilt-card img {
     transition: transform 0.15s ease !important;
     will-change: transform;
+}
+
+/* ── Card spotlight overlay ──────────────────────────────────── */
+.tilt-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+        circle at var(--sx, 50%) var(--sy, 50%),
+        rgba(251,191,36,0.11) 0%,
+        transparent 55%
+    );
+    opacity: var(--so, 0);
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+    z-index: 20;
+}
+
+
+/* ── Magnetic button ─────────────────────────────────────────── */
+.magnetic {
+    transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+                background-color 0.2s ease,
+                box-shadow 0.2s ease;
+}
+
+/* ── Hero noise texture ──────────────────────────────────────── */
+.hero-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+}
+
+/* ── Service icon hover glow ─────────────────────────────────── */
+.group:hover .svc-icon {
+    transform: scale(1.2) rotate(-8deg);
+    filter: drop-shadow(0 0 10px rgba(251,191,36,0.55));
+}
+
+/* ── Video hero cinemático ──────────────────────────────────── */
+#hero-video {
+    transform-origin: center center;
+}
+
+/* ── Clip-path reveal para títulos ──────────────────────────── */
+.reveal-clip {
+    clip-path: inset(0 0 100% 0);
+    transition: clip-path 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-clip.revealed {
+    clip-path: inset(0 0 0% 0);
+}
+
+/* ── Parallax image ──────────────────────────────────────────── */
+.parallax-wrap {
+    overflow: hidden;
+}
+.parallax-img {
+    will-change: transform;
+    transform: scale(1.18);
+}
+
+/* ── Cinematic noise en secciones oscuras ────────────────────── */
+.cinematic-section {
+    position: relative;
+}
+.cinematic-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+}
+
+/* ── Separador cinemático entre secciones ───────────────────── */
+.cinematic-section::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(251,191,36,0.15), transparent);
+    pointer-events: none;
+}
+
+/* ── Hover profundo en cards de galería ─────────────────────── */
+.parallax-wrap:hover .parallax-img {
+    transform: scale(1.22) !important;
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* ── Sección galería: overlay cinemático en hover ───────────── */
+.parallax-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.4s ease;
+}
+.parallax-wrap:hover::after {
+    background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%);
 }
 </style>

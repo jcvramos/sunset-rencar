@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "remotion:studio": "remotion studio remotion/index.ts",
+        "remotion:render": "remotion render remotion/index.ts HeroSunset public/img/hero_animated.mp4"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0.0",
@@ -20,7 +22,9 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "@remotion/cli": "^4.0.454",
         "aos": "^2.3.4",
+        "remotion": "^4.0.454",
         "swiper": "^12.1.3"
     }
 }

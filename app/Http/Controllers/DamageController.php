@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Damage;
 use App\Models\Reservation;
 use App\Models\Vehicle;
+use App\Services\ImageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -50,7 +51,13 @@ class DamageController extends Controller
         ]);
 
         if ($request->hasFile('evidence_photo')) {
-            $data['evidence_photo'] = $request->file('evidence_photo')->store('damages', 'public');
+            $data['evidence_photo'] = ImageService::compressAndStore(
+                $request->file('evidence_photo'),
+                'damages',
+                'public',
+                1600,
+                80
+            );
         }
 
         $data['reported_by'] = $request->user()->id;

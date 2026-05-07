@@ -13,7 +13,8 @@ class Client extends Model
     protected $fillable = [
         'first_name', 'last_name', 'identity_number', 'phone', 'whatsapp',
         'email', 'nationality', 'client_type', 'status', 'block_reason',
-        'license_photo', 'identity_photo', 'notes', 'source', 'city', 'country',
+        'license_photo', 'identity_photo', 'selfie_with_id_photo', 'face_photo',
+        'notes', 'source', 'city', 'country',
     ];
 
     protected $casts = [

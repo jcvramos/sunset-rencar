@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use App\Models\ReservationPhoto;
+use App\Services\ImageService;
 use App\Services\ReservationFlowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,10 +21,24 @@ class ReservationPhotoController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $path = $request->file('photo')->store(
+        // Si ya existía foto en esta zona/tipo, borrar el archivo previo
+        $existing = ReservationPhoto::where('reservation_id', $reservation->id)
+            ->where('type', $data['type'])
+            ->where('zone', $data['zone'])
+            ->first();
+        if ($existing) {
+            ImageService::delete($existing->path);
+        }
+
+        $path = ImageService::compressAndStore(
+            $request->file('photo'),
             "reservations/{$reservation->id}/{$data['type']}",
-            'public'
+            'public',
+            1600,
+            80
         );
+
+        $finalSize = Storage::disk('public')->exists($path) ? Storage::disk('public')->size($path) : 0;
 
         ReservationPhoto::updateOrCreate(
             [
@@ -34,8 +49,8 @@ class ReservationPhotoController extends Controller
             [
                 'path'         => $path,
                 'original_name'=> $request->file('photo')->getClientOriginalName(),
-                'mime_type'    => $request->file('photo')->getClientMimeType(),
-                'size'         => $request->file('photo')->getSize(),
+                'mime_type'    => 'image/jpeg',
+                'size'         => $finalSize,
                 'notes'        => $data['notes'] ?? null,
                 'captured_by'  => $request->user()->id,
                 'captured_at'  => now(),

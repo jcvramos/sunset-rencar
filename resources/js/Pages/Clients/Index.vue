@@ -17,30 +17,72 @@ const form = useForm({
     whatsapp: '', email: '', nationality: 'HN',
     client_type: 'nacional', status: 'normal',
     block_reason: '', notes: '', source: 'WhatsApp', city: '', country: 'Honduras',
+    license_photo: null, identity_photo: null,
+    selfie_with_id_photo: null, face_photo: null,
 });
+
+// Vista previa local de las fotos antes de enviar
+const previews = ref({
+    license_photo: null, identity_photo: null,
+    selfie_with_id_photo: null, face_photo: null,
+});
+
+// Fotos ya guardadas en el servidor (cuando se edita)
+const existing = ref({
+    license_photo: null, identity_photo: null,
+    selfie_with_id_photo: null, face_photo: null,
+});
+
+const onPickPhoto = (field, e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    form[field] = f;
+    previews.value[field] = URL.createObjectURL(f);
+};
+
+const photoUrl = (field) => previews.value[field] ?? (existing.value[field] ? `/storage/${existing.value[field]}` : null);
+
+const resetPhotoState = () => {
+    Object.keys(previews.value).forEach(k => {
+        if (previews.value[k]) URL.revokeObjectURL(previews.value[k]);
+        previews.value[k] = null;
+        existing.value[k] = null;
+    });
+};
 
 const openCreate = () => {
     form.reset();
+    resetPhotoState();
     editingId.value = null;
     showModal.value = true;
 };
 
 const openEdit = (c) => {
-    Object.keys(form).forEach(k => { if (k in c) form[k] = c[k] ?? ''; });
+    form.reset();
+    resetPhotoState();
+    // Solo asignar campos de texto; ignorar las claves de file (irían como string)
+    const photoFields = ['license_photo', 'identity_photo', 'selfie_with_id_photo', 'face_photo'];
+    Object.keys(form).forEach(k => {
+        if (photoFields.includes(k)) return;
+        if (k in c) form[k] = c[k] ?? '';
+    });
     form.block_reason = c.block_reason ?? '';
+    photoFields.forEach(f => { existing.value[f] = c[f] ?? null; });
     editingId.value   = c.id;
     showModal.value   = true;
 };
 
 const submit = () => {
+    const opts = {
+        forceFormData: true,
+        onSuccess: () => { showModal.value = false; resetPhotoState(); },
+    };
     if (editingId.value) {
-        form.patch(route('clients.update', editingId.value), {
-            onSuccess: () => { showModal.value = false; },
-        });
+        // Method spoofing: PATCH con archivos requiere POST + campo _method
+        form.transform((data) => ({ ...data, _method: 'patch' }))
+            .post(route('clients.update', editingId.value), opts);
     } else {
-        form.post(route('clients.store'), {
-            onSuccess: () => { showModal.value = false; },
-        });
+        form.post(route('clients.store'), opts);
     }
 };
 
@@ -262,6 +304,43 @@ const typeBadge = {
                             <label class="block text-sm font-medium text-gray-700 mb-1">Notas internas</label>
                             <textarea v-model="form.notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
                         </div>
+                    </div>
+
+                    <!-- KYC: 4 fotos -->
+                    <div class="border-t pt-4">
+                        <p class="text-sm font-semibold text-gray-800 mb-1">📸 Verificación de identidad (KYC)</p>
+                        <p class="text-xs text-gray-500 mb-3">Las fotos se comprimen automáticamente al subirlas (máx ~300KB cada una).</p>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div v-for="slot in [
+                                { field: 'identity_photo',       label: 'Documento (DNI / pasaporte)', icon: '🪪' },
+                                { field: 'selfie_with_id_photo', label: 'Sosteniendo el documento',     icon: '🤳' },
+                                { field: 'face_photo',           label: 'Facial (sin lentes ni gorra)', icon: '😊' },
+                                { field: 'license_photo',        label: 'Licencia de conducir',          icon: '🚗' },
+                            ]" :key="slot.field"
+                                class="border-2 border-dashed border-gray-300 rounded-lg p-2 text-center hover:border-red-400 transition-colors">
+                                <p class="text-[11px] font-medium text-gray-700 mb-1">{{ slot.icon }} {{ slot.label }}</p>
+                                <div v-if="photoUrl(slot.field)" class="relative">
+                                    <img :src="photoUrl(slot.field)" class="w-full h-24 object-cover rounded" />
+                                    <label class="block mt-1 cursor-pointer text-[11px] text-blue-600 hover:underline">
+                                        Reemplazar
+                                        <input type="file" accept="image/*" capture="environment" class="hidden"
+                                               @change="onPickPhoto(slot.field, $event)" />
+                                    </label>
+                                </div>
+                                <label v-else class="block cursor-pointer">
+                                    <div class="h-24 flex items-center justify-center text-gray-400 text-xs">
+                                        + Tocar para subir
+                                    </div>
+                                    <input type="file" accept="image/*" capture="environment" class="hidden"
+                                           @change="onPickPhoto(slot.field, $event)" />
+                                </label>
+                            </div>
+                        </div>
+                        <p v-if="form.errors.identity_photo || form.errors.selfie_with_id_photo || form.errors.face_photo || form.errors.license_photo"
+                           class="text-red-500 text-xs mt-2">
+                            {{ form.errors.identity_photo || form.errors.selfie_with_id_photo || form.errors.face_photo || form.errors.license_photo }}
+                        </p>
                     </div>
                     <div class="flex justify-end gap-3 pt-2">
                         <button type="button" @click="showModal = false"

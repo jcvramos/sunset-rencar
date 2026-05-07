@@ -62,7 +62,7 @@ class ReservationController extends Controller
             'client_id'                => 'required|exists:clients,id',
             'vehicle_type_id'          => 'required|exists:vehicle_types,id',
             'vehicle_id'               => 'nullable|exists:vehicles,id',
-            'start_date'               => 'required|date|after_or_equal:today',
+            'start_date'               => 'required|date',
             'end_date'                 => 'required|date|after_or_equal:start_date',
             'daily_rate'               => 'required|numeric|min:0',
             'discount'                 => 'nullable|numeric|min:0',

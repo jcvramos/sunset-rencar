@@ -11,6 +11,21 @@ class Vehicle extends Model
 {
     use SoftDeletes;
 
+    public const CATALOG_ZONES = [
+        'frontal_3_4'       => 'Frontal 3/4',
+        'frontal'           => 'Frontal',
+        'lateral_izq'       => 'Lateral Izq.',
+        'lateral_der'       => 'Lateral Der.',
+        'trasera_3_4'       => 'Trasera 3/4',
+        'trasera'           => 'Trasera',
+        'interior_general'  => 'Interior',
+        'tablero'           => 'Tablero',
+        'asientos_traseros' => 'Asientos traseros',
+        'maletero'          => 'Maletero',
+        'rines'             => 'Rines / llantas',
+        'detalle_extra'     => 'Detalle / extra',
+    ];
+
     protected $fillable = [
         'plate', 'name', 'vehicle_type_id', 'brand', 'model', 'year',
         'color', 'seats', 'status', 'is_own', 'sublessor_id',

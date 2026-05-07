@@ -16,16 +16,64 @@ const vehicleId = ref(props.filters?.vehicle_id ?? '');
 const form = useForm({
     vehicle_id: '', client_id: '', reservation_id: '',
     zone: 'frontal', description: '',
-    evidence_photo: null, amount_charged: 0,
+    photos: [], amount_charged: 0,
     linked_to_deposit: false, occurred_at: '', notes: '',
 });
 
-const open = () => { form.reset(); showModal.value = true; };
+const previews = ref([]);
+
+const onPickPhotos = (e) => {
+    const files = Array.from(e.target.files || []);
+    form.photos = [...(form.photos || []), ...files];
+    files.forEach(f => previews.value.push(URL.createObjectURL(f)));
+    e.target.value = '';
+};
+
+const removeStaged = (idx) => {
+    URL.revokeObjectURL(previews.value[idx]);
+    previews.value.splice(idx, 1);
+    form.photos.splice(idx, 1);
+};
+
+const open = () => {
+    form.reset();
+    previews.value.forEach(u => URL.revokeObjectURL(u));
+    previews.value = [];
+    showModal.value = true;
+};
 
 const submit = () => form.post(route('damages.store'), {
     forceFormData: true,
-    onSuccess: () => showModal.value = false,
+    onSuccess: () => {
+        previews.value.forEach(u => URL.revokeObjectURL(u));
+        previews.value = [];
+        showModal.value = false;
+    },
 });
+
+// Agregar fotos a un daño existente
+const addMore = (damage, e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    router.post(route('damages.photos.add', damage.id), { photos: files }, {
+        forceFormData: true,
+        preserveScroll: true,
+        onFinish: () => { e.target.value = ''; },
+    });
+};
+
+const removePhoto = (damage, path) => {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    router.delete(route('damages.photos.remove', damage.id), {
+        data: { path },
+        preserveScroll: true,
+    });
+};
+
+const allPhotos = (d) => [
+    ...(d.evidence_photo ? [d.evidence_photo] : []),
+    ...(d.extra_photos ?? []),
+];
 
 const updateStatus = (d, newStatus) => {
     router.patch(route('damages.update', d.id), { status: newStatus, amount_charged: d.amount_charged ?? 0 }, { preserveScroll: true });
@@ -87,11 +135,31 @@ const statusBadge = (s) => ({
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <tr v-for="d in damages.data" :key="d.id" class="hover:bg-gray-50">
+                    <tr v-for="d in damages.data" :key="d.id" class="hover:bg-gray-50 align-top">
                         <td class="px-4 py-3">{{ d.vehicle?.name }} <span class="text-xs text-gray-400">({{ d.vehicle?.plate }})</span></td>
                         <td class="px-4 py-3 font-mono text-xs">{{ d.reservation?.code ?? '—' }}</td>
                         <td class="px-4 py-3">{{ d.zone }}</td>
-                        <td class="px-4 py-3 text-xs">{{ d.description }}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <p>{{ d.description }}</p>
+                            <!-- Galería de miniaturas -->
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                <div v-for="p in allPhotos(d)" :key="p" class="relative group">
+                                    <a :href="`/storage/${p}`" target="_blank">
+                                        <img :src="`/storage/${p}`" class="w-12 h-12 object-cover rounded border" />
+                                    </a>
+                                    <button @click="removePhoto(d, p)"
+                                            class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition">
+                                        ✕
+                                    </button>
+                                </div>
+                                <label class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 cursor-pointer hover:border-amber-400 text-lg">
+                                    +
+                                    <input type="file" accept="image/*" multiple capture="environment" class="hidden"
+                                           @change="addMore(d, $event)" />
+                                </label>
+                            </div>
+                            <p v-if="allPhotos(d).length" class="text-[10px] text-gray-400 mt-1">{{ allPhotos(d).length }} foto(s)</p>
+                        </td>
                         <td class="px-4 py-3">
                             <span v-if="d.client">{{ d.client.first_name }} {{ d.client.last_name }}</span>
                             <span v-else class="text-gray-400">—</span>
@@ -143,10 +211,21 @@ const statusBadge = (s) => ({
                         <label class="text-xs text-gray-500">Descripción *</label>
                         <textarea v-model="form.description" rows="3" required class="w-full rounded border-gray-300"></textarea>
                     </div>
-                    <div>
-                        <label class="text-xs text-gray-500">Foto evidencia</label>
-                        <input type="file" accept="image/*" @change="form.evidence_photo = $event.target.files[0]"
-                               class="block w-full text-xs" />
+                    <div class="md:col-span-2">
+                        <label class="text-xs text-gray-500">Fotos del daño (máx 10)</label>
+                        <input type="file" accept="image/*" multiple capture="environment"
+                               @change="onPickPhotos"
+                               class="block w-full text-xs mb-2" />
+                        <div v-if="previews.length" class="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                            <div v-for="(url, idx) in previews" :key="idx" class="relative group">
+                                <img :src="url" class="w-full h-16 object-cover rounded border" />
+                                <button type="button" @click="removeStaged(idx)"
+                                        class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full opacity-0 group-hover:opacity-100 transition">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">{{ previews.length }} foto(s) seleccionada(s)</p>
                     </div>
                     <div>
                         <label class="text-xs text-gray-500">Monto a cobrar (L.)</label>

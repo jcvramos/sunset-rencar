@@ -25,13 +25,16 @@ class VehicleController extends Controller
                 'model'        => $v->model,
                 'year'         => $v->year,
                 'color'        => $v->color,
+                'seats'        => $v->seats,
                 'status'       => $v->status,
                 'is_own'       => $v->is_own,
                 'daily_rate'   => $v->daily_rate,
                 'deposit_amount' => $v->deposit_amount,
+                'description'  => $v->description,
                 'is_active'    => $v->is_active,
                 'vehicle_type' => $v->vehicleType?->only('id', 'name', 'emoji'),
                 'main_photo'   => $v->main_photo,
+                'photos'       => $v->photos ?? [],
             ]);
 
         $vehicleTypes = VehicleType::where('is_active', true)
@@ -41,6 +44,7 @@ class VehicleController extends Controller
         return Inertia::render('Vehicles/Index', [
             'vehicles'     => $vehicles,
             'vehicleTypes' => $vehicleTypes,
+            'catalogZones' => Vehicle::CATALOG_ZONES,
         ]);
     }
 

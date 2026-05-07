@@ -6,7 +6,44 @@ import { ref, computed } from 'vue';
 const props = defineProps({
     vehicles: Array,
     vehicleTypes: Array,
+    catalogZones: Object,
 });
+
+// --- Galería ---
+const showGallery   = ref(false);
+const galleryVehicle = ref(null);
+
+const openGallery = (v) => { galleryVehicle.value = v; showGallery.value = true; };
+
+const photoForm = useForm({ zone: '', photo: null });
+
+const uploadPhoto = (zone, e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    photoForm.zone  = zone;
+    photoForm.photo = f;
+    photoForm.post(route('vehicles.photos.store', galleryVehicle.value.id), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            // Refrescar la prop tras Inertia reload
+            const updated = props.vehicles.find(x => x.id === galleryVehicle.value.id);
+            if (updated) galleryVehicle.value = updated;
+        },
+        onFinish: () => { e.target.value = ''; photoForm.reset(); },
+    });
+};
+
+const deleteZonePhoto = (zone) => {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    router.delete(route('vehicles.photos.destroy', [galleryVehicle.value.id, zone]), { preserveScroll: true });
+};
+
+const setMainPhoto = (zone) => {
+    router.patch(route('vehicles.photos.main', [galleryVehicle.value.id, zone]), {}, { preserveScroll: true });
+};
+
+const photoCount = (v) => Object.keys(v.photos ?? {}).length;
 
 // --- Modal ---
 const showModal   = ref(false);
@@ -158,6 +195,10 @@ const statusLabel = {
                         <td class="px-4 py-3 text-gray-600 text-xs">{{ v.is_own ? 'Propia' : 'Subarrendada' }}</td>
                         <td class="px-4 py-3">
                             <div class="flex gap-2 justify-end">
+                                <button @click="openGallery(v)"
+                                    class="text-amber-600 hover:text-amber-800 text-xs font-medium px-2 py-1 rounded hover:bg-amber-50">
+                                    📸 {{ photoCount(v) }}/12
+                                </button>
                                 <button @click="openEdit(v)"
                                     class="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">
                                     Editar
@@ -261,6 +302,51 @@ const statusLabel = {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Modal de galería -->
+        <div v-if="showGallery && galleryVehicle" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between p-5 border-b">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">📸 Galería: {{ galleryVehicle.name }}</h2>
+                        <p class="text-xs text-gray-500">{{ photoCount(galleryVehicle) }} de 12 zonas — la principal aparece en el catálogo público</p>
+                    </div>
+                    <button @click="showGallery = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                </div>
+                <div class="p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div v-for="(label, zone) in catalogZones" :key="zone"
+                         class="border rounded-lg overflow-hidden"
+                         :class="galleryVehicle.photos?.[zone] ? 'border-emerald-300' : 'border-dashed border-gray-300'">
+                        <div class="px-2 py-1.5 bg-gray-50 border-b text-xs font-medium text-gray-700 flex items-center justify-between">
+                            <span>{{ label }}</span>
+                            <span v-if="galleryVehicle.photos?.[zone] === galleryVehicle.main_photo"
+                                  class="text-amber-600 text-[10px] font-bold">⭐ PRINCIPAL</span>
+                        </div>
+                        <div v-if="galleryVehicle.photos?.[zone]" class="relative">
+                            <a :href="`/storage/${galleryVehicle.photos[zone]}`" target="_blank">
+                                <img :src="`/storage/${galleryVehicle.photos[zone]}`" class="w-full h-32 object-cover" />
+                            </a>
+                            <div class="p-1.5 flex gap-1 text-xs">
+                                <button v-if="galleryVehicle.photos[zone] !== galleryVehicle.main_photo"
+                                        @click="setMainPhoto(zone)" class="text-amber-600 hover:underline">⭐ Principal</button>
+                                <button @click="deleteZonePhoto(zone)" class="text-red-500 hover:underline ml-auto">Eliminar</button>
+                            </div>
+                        </div>
+                        <label v-else class="block cursor-pointer p-3 text-center hover:bg-amber-50">
+                            <div class="h-24 flex items-center justify-center text-gray-400 text-xs">+ Subir foto</div>
+                            <input type="file" accept="image/*" capture="environment" class="hidden"
+                                   @change="uploadPhoto(zone, $event)" />
+                        </label>
+                    </div>
+                </div>
+                <div class="px-5 py-3 border-t bg-gray-50 flex justify-end">
+                    <button @click="showGallery = false"
+                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-white">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>

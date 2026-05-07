@@ -14,6 +14,7 @@ use App\Http\Controllers\ReservationPhotoController;
 use App\Http\Controllers\SublessorController;
 use App\Http\Controllers\SublessorPayableController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\VehiclePhotoController;
 use Illuminate\Support\Facades\Route;
 
 // Landing page pública
@@ -32,6 +33,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // === FASE 1 ===
     Route::resource('vehicles', VehicleController::class)->except(['create', 'edit', 'show']);
     Route::patch('/vehicles/{vehicle}/status', [VehicleController::class, 'updateStatus'])->name('vehicles.status');
+    Route::post('/vehicles/{vehicle}/photos', [VehiclePhotoController::class, 'store'])->name('vehicles.photos.store');
+    Route::delete('/vehicles/{vehicle}/photos/{zone}', [VehiclePhotoController::class, 'destroy'])->name('vehicles.photos.destroy');
+    Route::patch('/vehicles/{vehicle}/photos/{zone}/main', [VehiclePhotoController::class, 'setMain'])->name('vehicles.photos.main');
 
     Route::resource('clients', ClientController::class)->except(['create', 'edit']);
     Route::patch('/clients/{client}/status', [ClientController::class, 'updateStatus'])->name('clients.status');
@@ -80,6 +84,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Daños
     Route::get('/damages', [DamageController::class, 'index'])->name('damages.index');
     Route::post('/damages', [DamageController::class, 'store'])->name('damages.store');
+    Route::post('/damages/{damage}/photos', [DamageController::class, 'addPhotos'])->name('damages.photos.add');
+    Route::delete('/damages/{damage}/photos', [DamageController::class, 'removePhoto'])->name('damages.photos.remove');
     Route::patch('/damages/{damage}', [DamageController::class, 'update'])->name('damages.update');
     Route::delete('/damages/{damage}', [DamageController::class, 'destroy'])->name('damages.destroy');
 });

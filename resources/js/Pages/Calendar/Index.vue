@@ -71,7 +71,11 @@ const loadAvailability = async () => {
         data.forEach(v => {
             busyMap.value[v.id] = {};
             v.busy_dates.forEach(b => {
-                busyMap.value[v.id][b.date] = b.status;
+                busyMap.value[v.id][b.date] = {
+                    status: b.status,
+                    position: b.position,
+                    reservation_id: b.reservation_id,
+                };
             });
         });
     } finally {
@@ -79,11 +83,22 @@ const loadAvailability = async () => {
     }
 };
 
-const getDayStatus = (vehicleId, day) => {
+const getDayInfo = (vehicleId, day) => {
     const month = String(currentMonth.value + 1).padStart(2, '0');
     const d     = String(day).padStart(2, '0');
     const key   = `${currentYear.value}-${month}-${d}`;
-    return busyMap.value[vehicleId]?.[key] ?? 'disponible';
+    return busyMap.value[vehicleId]?.[key] ?? { status: 'disponible', position: null };
+};
+
+const getDayStatus = (vehicleId, day) => getDayInfo(vehicleId, day).status;
+const getDayPosition = (vehicleId, day) => getDayInfo(vehicleId, day).position;
+
+const getDayIcon = (vehicleId, day) => {
+    const pos = getDayPosition(vehicleId, day);
+    if (pos === 'start')  return '🚗';
+    if (pos === 'end')    return '🏁';
+    if (pos === 'single') return '🚗🏁';
+    return '';
 };
 
 const dayClass = (status) => ({
@@ -128,6 +143,8 @@ onMounted(loadAvailability);
             <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-purple-200 inline-block"></span> Reservado</span>
             <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-200 inline-block"></span> Mantenimiento</span>
             <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-200 inline-block"></span> Bloqueado</span>
+            <span class="flex items-center gap-1 border-l pl-4 ml-2 border-gray-300">🚗 Inicio</span>
+            <span class="flex items-center gap-1">🏁 Fin</span>
         </div>
 
         <!-- Calendario tipo grid -->
@@ -153,9 +170,10 @@ onMounted(loadAvailability);
                             <div class="text-gray-400 font-mono">{{ vehicle.plate }}</div>
                         </td>
                         <td v-for="day in daysInMonth" :key="day" class="px-0.5 py-1 text-center">
-                            <div class="w-7 h-7 rounded flex items-center justify-center mx-auto text-xs font-medium cursor-default"
+                            <div class="w-7 h-7 rounded flex items-center justify-center mx-auto text-[11px] font-medium cursor-default leading-none"
                                 :class="dayClass(getDayStatus(vehicle.id, day))"
-                                :title="getDayStatus(vehicle.id, day)">
+                                :title="getDayStatus(vehicle.id, day) + (getDayPosition(vehicle.id, day) ? ' — ' + getDayPosition(vehicle.id, day) : '')">
+                                <span>{{ getDayIcon(vehicle.id, day) }}</span>
                             </div>
                         </td>
                     </tr>

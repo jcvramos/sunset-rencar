@@ -56,9 +56,36 @@ class CalendarController extends Controller
 
         // Construir mapa de ocupación por vehículo
         $data = $vehicles->map(function ($vehicle) {
-            $busyDates = $vehicle->availability->pluck('status', 'date')->map(
-                fn($status, $date) => ['date' => $date, 'status' => $status]
-            )->values();
+            // Detectar inicio/fin por reserva: agrupar por reservation_id
+            $byReservation = $vehicle->availability
+                ->filter(fn($a) => $a->reservation_id !== null)
+                ->groupBy('reservation_id');
+
+            $startDates = collect();
+            $endDates   = collect();
+            foreach ($byReservation as $rows) {
+                $sorted = $rows->sortBy('date')->values();
+                $startDates->push((string) $sorted->first()->date->toDateString());
+                $endDates->push((string) $sorted->last()->date->toDateString());
+            }
+
+            $busyDates = $vehicle->availability->map(function ($a) use ($startDates, $endDates) {
+                $date = (string) $a->date->toDateString();
+                $position = 'middle';
+                if ($startDates->contains($date) && $endDates->contains($date)) {
+                    $position = 'single';
+                } elseif ($startDates->contains($date)) {
+                    $position = 'start';
+                } elseif ($endDates->contains($date)) {
+                    $position = 'end';
+                }
+                return [
+                    'date'           => $date,
+                    'status'         => $a->status,
+                    'position'       => $position,
+                    'reservation_id' => $a->reservation_id,
+                ];
+            })->values();
 
             return [
                 'id'           => $vehicle->id,

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\PolicyCancellation;
 use App\Models\PolicyDestination;
+use App\Models\Sublessor;
 use App\Models\User;
 use App\Models\VehicleType;
 use Illuminate\Database\Seeder;
@@ -90,6 +91,35 @@ class DatabaseSeeder extends Seeder
                 ['hours_before' => $policy['hours_before'], 'hours_before_max' => $policy['hours_before_max']],
                 $policy
             );
+        }
+
+        // --- Subarrendadores demo ---
+        $sublessors = [
+            [
+                'name'            => 'Carlos Mendoza',
+                'identity_number' => '0501-1985-12345',
+                'phone'           => '+504 9988-1122',
+                'whatsapp'        => '+504 9988-1122',
+                'email'           => 'carlos.mendoza@example.com',
+                'city'            => 'San Pedro Sula',
+                'payment_method'  => 'transferencia',
+                'default_share'   => 70.00,
+                'notes'           => 'Subarrendador con 2 vehículos premium.',
+            ],
+            [
+                'name'            => 'María Flores',
+                'identity_number' => '0801-1990-54321',
+                'phone'           => '+504 9544-3322',
+                'whatsapp'        => '+504 9544-3322',
+                'email'           => 'maria.flores@example.com',
+                'city'            => 'Tegucigalpa',
+                'payment_method'  => 'transferencia',
+                'default_share'   => 65.00,
+            ],
+        ];
+
+        foreach ($sublessors as $s) {
+            Sublessor::firstOrCreate(['identity_number' => $s['identity_number']], $s);
         }
     }
 }

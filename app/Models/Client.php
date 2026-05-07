@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Client extends Model
@@ -18,6 +19,16 @@ class Client extends Model
     protected $casts = [
         'status' => 'string',
     ];
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    public function damages(): HasMany
+    {
+        return $this->hasMany(Damage::class);
+    }
 
     public function getFullNameAttribute(): string
     {

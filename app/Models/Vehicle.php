@@ -31,9 +31,24 @@ class Vehicle extends Model
         return $this->belongsTo(VehicleType::class);
     }
 
+    public function sublessor(): BelongsTo
+    {
+        return $this->belongsTo(Sublessor::class);
+    }
+
     public function availability(): HasMany
     {
         return $this->hasMany(VehicleAvailability::class);
+    }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    public function damages(): HasMany
+    {
+        return $this->hasMany(Damage::class);
     }
 
     public function isAvailableForDates(string $startDate, string $endDate): bool

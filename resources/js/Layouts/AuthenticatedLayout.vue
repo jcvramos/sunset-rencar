@@ -8,11 +8,16 @@ const showingNavigationDropdown = ref(false);
 const page = usePage();
 
 const navLinks = [
-    { label: 'Dashboard',   route: 'dashboard',       icon: '📊' },
-    { label: 'Flota',       route: 'vehicles.index',  icon: '🚗' },
-    { label: 'Clientes',    route: 'clients.index',   icon: '👥' },
-    { label: 'Calendario',  route: 'calendar.index',  icon: '📅' },
-    { label: 'Políticas',   route: 'policies.index',  icon: '⚙️'  },
+    { label: 'Dashboard',     route: 'dashboard',                  icon: '📊' },
+    { label: 'Reservas',      route: 'reservations.index',         icon: '📋' },
+    { label: 'Calendario',    route: 'calendar.index',             icon: '📅' },
+    { label: 'Flota',         route: 'vehicles.index',             icon: '🚗' },
+    { label: 'Clientes',      route: 'clients.index',              icon: '👥' },
+    { label: 'Subarrendad.',  route: 'sublessors.index',           icon: '🤝' },
+    { label: 'CxP',           route: 'sublessors.payables.index',  icon: '💵' },
+    { label: 'Daños',         route: 'damages.index',              icon: '🛠️' },
+    { label: 'Cancelaciones', route: 'cancellations.index',        icon: '✖️'  },
+    { label: 'Políticas',     route: 'policies.index',             icon: '⚙️'  },
 ];
 </script>
 

@@ -135,7 +135,7 @@ class ReservationFlowService
     /**
      * Bloquea las fechas de la reserva en el calendario.
      */
-    private function lockCalendar(Reservation $reservation): void
+    public function lockCalendar(Reservation $reservation, string $status = 'rentado'): void
     {
         if (!$reservation->vehicle_id) return;
 
@@ -146,7 +146,7 @@ class ReservationFlowService
             VehicleAvailability::updateOrCreate(
                 ['vehicle_id' => $reservation->vehicle_id, 'date' => $day->toDateString()],
                 [
-                    'status'         => 'rentado',
+                    'status'         => $status,
                     'reservation_id' => $reservation->id,
                 ]
             );
@@ -215,6 +215,7 @@ class ReservationFlowService
     {
         if ($reservation->vehicle) {
             $reservation->vehicle->update(['status' => 'rentado']);
+            $this->lockCalendar($reservation, 'rentado');
         }
     }
 

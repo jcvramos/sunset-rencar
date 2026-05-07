@@ -174,7 +174,13 @@ class ReservationController extends Controller
             'deposit_paid_at' => now(),
         ]);
 
-        return back()->with('success', 'Depósito registrado.');
+        // Bloquear el calendario inmediatamente al registrar el depósito
+        // (estado 'reservado'; pasa a 'rentado' al avanzar a la etapa de entrega)
+        if ($reservation->vehicle_id) {
+            $this->flow->lockCalendar($reservation, 'reservado');
+        }
+
+        return back()->with('success', 'Depósito registrado y fechas bloqueadas en calendario.');
     }
 
     public function destroy(Reservation $reservation): RedirectResponse

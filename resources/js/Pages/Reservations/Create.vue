@@ -59,6 +59,15 @@ const submit = () => form.post(route('reservations.store'));
         </template>
 
         <form @submit.prevent="submit" class="bg-white rounded-xl border border-gray-200 p-6 space-y-5 max-w-4xl">
+            <div v-if="Object.keys(form.errors).length"
+                 class="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700">
+                <p class="font-semibold mb-1">Revisa los siguientes campos:</p>
+                <ul class="list-disc ml-5 text-xs">
+                    <li v-for="(msg, key) in form.errors" :key="key">
+                        <strong>{{ key }}:</strong> {{ msg }}
+                    </li>
+                </ul>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
